@@ -60,37 +60,38 @@ void computeCpuResults(float *g_data, int dimx, int dimy, int niterations,
 }
 
 __global__ void kernel_A(float *g_data, int dimx, int dimy, int niterations) {
-  int ix = blockIdx.x * blockDim.x + threadIdx.x;
-  int iy = blockIdx.y * blockDim.y + threadIdx.y;
+  for (int iy = blockIdx.y * blockDim.y + threadIdx.y; iy < dimy;
+       iy += blockDim.y * gridDim.y) {
+    for (int ix = blockIdx.x * blockDim.x + threadIdx.x; ix < dimx;
+         ix += blockDim.x * gridDim.x) {
+      int idx = iy * dimx + ix;
+      float value = g_data[idx];
 
-  if (ix < dimx && iy < dimy) {
-    int idx = iy * dimx + ix;
-    float value = g_data[idx];
+      int pattern = ix & 3;
 
-    int pattern = ix & 3;
-
-    for (int i = 0; i < niterations; i++) {
-      float temp;
-      switch (pattern) {
-        case 0:
-          temp = __logf(value) + 1.f;
+      if (pattern == 0) {
+        for (int i = 0; i < niterations; i++) {
+          float temp = __logf(value) + 1.f;
           value += __fsqrt_rn(temp);
-          break;
-        case 1:
-          temp = __cosf(value) + 1.f;
+        }
+      } else if (pattern == 1) {
+        for (int i = 0; i < niterations; i++) {
+          float temp = __cosf(value) + 1.f;
           value += __fsqrt_rn(temp);
-          break;
-        case 2:
-          temp = __sinf(value) + 1.f;
+        }
+      } else if (pattern == 2) {
+        for (int i = 0; i < niterations; i++) {
+          float temp = __sinf(value) + 1.f;
           value += __fsqrt_rn(temp);
-          break;
-        case 3:
-          temp = __tanf(value) + 1.f;
+        }
+      } else {
+        for (int i = 0; i < niterations; i++) {
+          float temp = __tanf(value) + 1.f;
           value += __fsqrt_rn(temp);
-          break;
+        }
       }
+      g_data[idx] = value;
     }
-    g_data[idx] = value;
   }
 }
 
@@ -106,9 +107,6 @@ void launchKernel(float * d_data, int dimx, int dimy, int niterations) {
   dim3 block(32, 32);
   dim3 grid((dimx + block.x - 1) / block.x,
             (dimy + block.y - 1) / block.y);
-
-  if (grid.x > num_sms * 8) grid.x = num_sms * 8;
-  if (grid.y > num_sms * 8) grid.y = num_sms * 8;
 
   kernel_A<<<grid, block>>>(d_data, dimx, dimy, niterations);
 }
